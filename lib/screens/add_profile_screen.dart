@@ -560,11 +560,58 @@ class _AddProfileScreenState extends State<AddProfileScreen> {
     String location1,
     String country,
   ) async {
-    // 1. Show subscription prompt dialog first
+    if (mounted) {
+      setState(() => _isLoading = true);
+    }
+
+    // 1. Initialize and query In-App Purchase exclusively for create_profile_499
+    final payment = PaymentService();
+    payment.initialize();
+
+    final bool available = await payment.loadProducts(['create_profile_499']);
+
+    ProductDetails? targetProduct;
+    if (available && payment.products.isNotEmpty) {
+      for (final p in payment.products) {
+        if (p.id == 'create_profile_499') {
+          targetProduct = p;
+          break;
+        }
+      }
+    }
+
+    if (!available || targetProduct == null) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+        await showDialog(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            title: const Text('Subscription Unavailable', style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.bold)),
+            content: const Text(
+              'Unable to load the subscription details from the store. Please ensure your device is connected to the App Store / Play Store and try again.',
+              style: TextStyle(fontFamily: 'Poppins', fontSize: 14),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('OK', style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.bold)),
+              ),
+            ],
+          ),
+        );
+      }
+      return;
+    }
+
+    final ProductDetails product = targetProduct;
+    final String displayPrice = product.price.isNotEmpty ? product.price : '₹499';
+
     if (mounted) {
       setState(() => _isLoading = false);
     }
-    
+
+    // 2. Show subscription prompt dialog with the dynamic local price (INR / USD / etc.)
     final bool? proceed = await showDialog<bool>(
       context: context,
       barrierDismissible: false,
@@ -577,15 +624,15 @@ class _AddProfileScreenState extends State<AddProfileScreen> {
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
-          children: const [
+          children: [
             Text(
-              'Creating a Business Profile requires an annual subscription of ₹499 for 1 year.',
-              style: TextStyle(fontFamily: 'Poppins', fontSize: 14),
+              'Creating a Business Profile requires an annual subscription of $displayPrice for 1 year.',
+              style: const TextStyle(fontFamily: 'Poppins', fontSize: 14),
             ),
-            SizedBox(height: 12),
+            const SizedBox(height: 12),
             Text(
-              'Price: ₹499 / 1 Year',
-              style: TextStyle(
+              'Price: $displayPrice / 1 Year',
+              style: const TextStyle(
                 fontFamily: 'Poppins',
                 fontWeight: FontWeight.bold,
                 fontSize: 16,
@@ -605,7 +652,7 @@ class _AddProfileScreenState extends State<AddProfileScreen> {
               foregroundColor: Colors.black,
             ),
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Pay ₹499', style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.bold)),
+            child: Text('Pay $displayPrice', style: const TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.bold)),
           ),
         ],
       ),
@@ -628,90 +675,20 @@ class _AddProfileScreenState extends State<AddProfileScreen> {
       setState(() => _isLoading = true);
     }
 
-    // 2. Initialize and load In-App Purchase products
-    final payment = PaymentService();
-    payment.initialize();
-
-    // Query In-App Purchases for active store products (prioritize create_profile_499, fallback to existing promote_3/promote_1)
-    final bool available = await payment.loadProducts([
-      'create_profile_499',
-      'promote_3',
-      'promote_1',
-      'promote_2',
-      'promote_4',
-    ]);
-
-    if (!available || payment.products.isEmpty) {
-      if (mounted) {
-        setState(() => _isLoading = false);
-        await showDialog(
-          context: context,
-          builder: (ctx) => AlertDialog(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-            title: const Text('In-App Purchase Unavailable', style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.bold)),
-            content: const Text(
-              'Unable to load subscription details from the store. Please ensure your device is connected to the App Store / Play Store and try again.',
-              style: TextStyle(fontFamily: 'Poppins', fontSize: 14),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx),
-                child: const Text('OK', style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.bold)),
-              ),
-            ],
-          ),
-        );
-      }
-      return;
-    }
-
-    ProductDetails? targetProduct;
-    for (final p in payment.products) {
-      if (p.id == 'create_profile_499') {
-        targetProduct = p;
-        break;
-      }
-    }
-    if (targetProduct == null) {
-      for (final p in payment.products) {
-        if (p.id == 'promote_3') {
-          targetProduct = p;
-          break;
-        }
-      }
-    }
-    if (targetProduct == null && payment.products.isNotEmpty) {
-      targetProduct = payment.products.first;
-    }
-
-    if (targetProduct == null) {
-      if (mounted) {
-        setState(() => _isLoading = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Payment failed. Product not found.'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-      return;
-    }
-
-    final ProductDetails product = targetProduct;
-
     StreamSubscription<PurchaseDetails>? sub;
     bool handled = false;
 
     sub = payment.purchaseStream.listen((purchase) async {
+      if (purchase.productID != 'create_profile_499') return;
       if (handled) return;
 
       if (purchase.status == PurchaseStatus.purchased || purchase.status == PurchaseStatus.restored) {
         handled = true;
         sub?.cancel();
-        final txId = purchase.purchaseID ?? 'tx_499_${DateTime.now().millisecondsSinceEpoch}';
+        final txId = purchase.purchaseID ?? 'tx_sub_${DateTime.now().millisecondsSinceEpoch}';
         finalBody['transaction_id'] = txId;
         finalBody['payment_status'] = 'completed';
-        finalBody['amount'] = '499';
+        finalBody['amount'] = displayPrice;
 
         await _createProfileInBackend(finalBody, phone, location, location1, country);
       } else if (purchase.status == PurchaseStatus.error || purchase.status == PurchaseStatus.canceled) {
@@ -730,7 +707,7 @@ class _AddProfileScreenState extends State<AddProfileScreen> {
     });
 
     try {
-      await payment.buyProduct(product);
+      await payment.buyProduct(product, consumable: false);
     } catch (e) {
       handled = true;
       sub.cancel();

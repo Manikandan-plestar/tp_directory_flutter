@@ -13,6 +13,7 @@ import '../widgets/app_header.dart';
 import '../widgets/header_menu.dart';
 import 'details_screen.dart';
 import 'my_contacts_screen.dart';
+import 'phone_entry_screen.dart';
 
 import '../services/countries.dart';
 import '../widgets/country_picker_dialog.dart';
@@ -1886,12 +1887,36 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  Future<void> _openDirectoryCreation() async {
+    var email = widget.session.email ?? '';
+    if (email.isEmpty) {
+      final s = await widget.store.read();
+      email = s.email ?? '';
+    }
+    if (!mounted) return;
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => PhoneEntryScreen(email: email),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final screenHeight = MediaQuery.of(context).size.height;
 
     return Scaffold(
       backgroundColor: const Color(0xFFF0F4F9),
+      floatingActionButton: FloatingActionButton(
+        onPressed: _openDirectoryCreation,
+        backgroundColor: const Color(0xFF4C5B8F),
+        foregroundColor: Colors.white,
+        elevation: 4,
+        shape: const CircleBorder(),
+        tooltip: 'Add Directory',
+        child: const Icon(Icons.add, size: 28),
+      ),
       body: SafeArea(
         child: Stack(
           children: [
@@ -2023,7 +2048,7 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           Expanded(
             child: ListView.builder(
-              padding: const EdgeInsets.only(top: 2, bottom: 20),
+              padding: const EdgeInsets.only(top: 2, bottom: 80),
               itemCount: nearbyList.length,
               itemBuilder: (c, i) {
                 final contact = nearbyList[i];
@@ -2075,7 +2100,7 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           )
         : ListView.builder(
-            padding: const EdgeInsets.only(top: 6, bottom: 20),
+            padding: const EdgeInsets.only(top: 6, bottom: 80),
             itemCount: _results.length,
             itemBuilder: (c, i) {
               final contact = _results[i];

@@ -1,4 +1,4 @@
-package com.plestar.fonebook
+package com.plestar.tpdirectory
 
 import io.flutter.embedding.android.FlutterActivity
 

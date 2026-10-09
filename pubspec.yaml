@@ -1,8 +1,8 @@
-name: fonebook
-description: "Fone Book is a modern-day global telephone directory app that contains the contacts information of individuals, professionals, organizations and freelancers."
+name: telephone_directory
+description: "Telephone Directory is a modern-day global telephone directory app that contains the contacts information of individuals, professionals, organizations and freelancers."
 publish_to: 'none'
 
-version: 1.0.14+51
+version: 1.6.9+38
 
 environment:
   sdk: ^3.5.0
