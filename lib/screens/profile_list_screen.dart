@@ -347,11 +347,22 @@ class _ProfileListScreenState extends State<ProfileListScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text(
-                    p.name.toTitleCase(),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: Color(0xFF212529), fontFamily: 'Poppins'),
+                  Row(
+                    children: [
+                      Flexible(
+                        child: Text(
+                          p.name.toTitleCase(),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: Color(0xFF212529), fontFamily: 'Poppins'),
+                        ),
+                      ),
+                      if (p.verified == 1)
+                        Padding(
+                          padding: const EdgeInsets.only(left: 4),
+                          child: Image.asset('assets/images/verified.png', width: 14, height: 14),
+                        ),
+                    ],
                   ),
                   if (p.service.isNotEmpty) ...[
                     const SizedBox(height: 2),

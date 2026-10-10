@@ -886,7 +886,8 @@ class _HomeScreenState extends State<HomeScreen> {
       if (c.category == 'my_contact' || _isMyContactMatch(c)) return 1; // My Contact Tier 1
       final bal = double.tryParse(c.priorityBalance) ?? 0.0;
       if (bal > 0 || c.priority == '0') return 2; // Sponsored Tier 2
-      return 3; // Normal Profile Tier 3
+      if (c.verified == 1) return 3; // Verified Tier 3
+      return 4; // Normal Profile Tier 4
     }
 
     int calcLocationHierarchyTier(DirectoryContact c) {
@@ -924,7 +925,7 @@ class _HomeScreenState extends State<HomeScreen> {
     }).toList();
 
     wrappers.sort((a, b) {
-      // 1. Primary Priority Hierarchy: 1 = My Contact, 2 = Sponsored, 3 = Normal Profile
+      // 1. Primary Priority Hierarchy: 1 = My Contact, 2 = Sponsored, 3 = Verified, 4 = Normal
       if (a.priorityTier != b.priorityTier) return a.priorityTier.compareTo(b.priorityTier);
 
       // 2. Within Tier 1 (My Contact)
@@ -944,11 +945,10 @@ class _HomeScreenState extends State<HomeScreen> {
         return a.nameLower.compareTo(b.nameLower);
       }
 
-      // 4. Within Tier 3 (Normal Directory Profiles): Ordered strictly from nearest to farthest
+      // 4. Within Tier 3 (Verified) and Tier 4 (Normal)
       if (a.distanceMeters != b.distanceMeters) return a.distanceMeters.compareTo(b.distanceMeters);
       if (a.locationHierarchyTier != b.locationHierarchyTier) return a.locationHierarchyTier.compareTo(b.locationHierarchyTier);
       if (a.searchScore != b.searchScore) return a.searchScore.compareTo(b.searchScore);
-      if (a.contact.verified != b.contact.verified) return b.contact.verified.compareTo(a.contact.verified);
       return a.nameLower.compareTo(b.nameLower);
     });
 

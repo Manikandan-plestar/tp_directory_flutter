@@ -72,6 +72,7 @@ class _AddProfileScreenState extends State<AddProfileScreen> {
   final _api = ApiClient();
   final _store = SessionStore();
   DirectoryContact? _existingProfile;
+  bool? _isEligibleForFreeProfile;
 
   @override
   void initState() {
@@ -87,8 +88,29 @@ class _AddProfileScreenState extends State<AddProfileScreen> {
     
     _locationController = TextEditingController();
     
-    if (widget.contact != null || widget.profileId != null || (widget.phone != null && widget.initialPhone == null)) {
+    final isEdit = widget.contact != null || widget.profileId != null || (widget.phone != null && widget.initialPhone == null);
+    if (isEdit) {
       _loadProfile();
+    } else {
+      _checkEligibility();
+    }
+  }
+
+  Future<void> _checkEligibility() async {
+    try {
+      final res = await _api.get('check_free_profile_eligibility', {'email': widget.email});
+      if (mounted && res is Map && res['eligible'] != null) {
+        setState(() {
+          _isEligibleForFreeProfile = res['eligible'] == true;
+        });
+      }
+    } catch (e) {
+      debugPrint("Check eligibility error: $e");
+      if (mounted) {
+        setState(() {
+          _isEligibleForFreeProfile = false;
+        });
+      }
     }
   }
 
@@ -542,8 +564,13 @@ class _AddProfileScreenState extends State<AddProfileScreen> {
           }
         }
       } else {
-        // NEW Business Profile Creation: Enforce ₹499 Annual Subscription Payment
-        await _processProfilePaymentAndSave(finalBody, phone, location, location1, country);
+        // NEW Business Profile Creation
+        if (_isEligibleForFreeProfile == true) {
+          finalBody['is_free'] = 'true';
+          await _createProfileInBackend(finalBody, phone, location, location1, country);
+        } else {
+          await _processProfilePaymentAndSave(finalBody, phone, location, location1, country);
+        }
       }
     } catch (e) {
       if (mounted) {
@@ -605,7 +632,7 @@ class _AddProfileScreenState extends State<AddProfileScreen> {
     }
 
     final ProductDetails product = targetProduct;
-    final String displayPrice = product.price.isNotEmpty ? product.price : '₹499';
+    final String displayPrice = product.price.isNotEmpty ? product.price : '₹500';
 
     if (mounted) {
       setState(() => _isLoading = false);
@@ -634,7 +661,7 @@ class _AddProfileScreenState extends State<AddProfileScreen> {
               'Price: $displayPrice / 1 Year',
               style: const TextStyle(
                 fontFamily: 'Poppins',
-                fontWeight: FontWeight.bold,
+                 fontWeight: FontWeight.bold,
                 fontSize: 16,
                 color: Color(0xFFD7B41A),
               ),
@@ -759,8 +786,10 @@ class _AddProfileScreenState extends State<AddProfileScreen> {
         if (mounted) {
           setState(() => _isLoading = false);
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Payment Verified! Business Profile created successfully with 1-Year Subscription.'),
+            SnackBar(
+              content: Text(finalBody['is_free'] == 'true' 
+                  ? 'First Business Profile created successfully for Free!' 
+                  : 'Payment Verified! Business Profile created successfully with 1-Year Subscription.'),
               backgroundColor: Colors.green,
             ),
           );

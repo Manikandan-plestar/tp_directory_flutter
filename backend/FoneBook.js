@@ -194,6 +194,20 @@ db.connect((err) => {
     }
     // console.log('Connected to MySQL');
 
+    db.query(`CREATE TABLE IF NOT EXISTS user_profile_entitlements (
+      user_id varchar(191) NOT NULL,
+      free_business_profile_used_at datetime DEFAULT NULL,
+      created_at datetime NOT NULL DEFAULT current_timestamp(),
+      updated_at datetime NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+      PRIMARY KEY (user_id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;`, (err) => {
+        if (err) console.error("Error creating user_profile_entitlements table:", err);
+    });
+
+    db.query(`UPDATE contacts SET verification = 1 WHERE payment_status = 'completed' AND transaction_id IS NOT NULL AND transaction_id != 'FREE_PROFILE' AND verification = 0;`, (err) => {
+        if (err) console.error("Error migrating verified profiles:", err);
+    });
+
     const migrateLegacyReviews = () => {
         const legacyMigrationSql = `
             UPDATE reviews r
@@ -437,6 +451,31 @@ app.post('/receiveData', (req, res) => {
     }
 });
 
+app.get('/check_free_profile_eligibility', (req, res) => {
+    const userEmail = req.query.email;
+    if (!userEmail) return res.status(400).json({ error: 'Email required' });
+
+    db.query("SELECT * FROM user_profile_entitlements WHERE user_id = ?", [userEmail], (err, entResult) => {
+        if (err) return res.status(500).json({ error: 'Database error' });
+        if (entResult.length > 0) {
+            if (entResult[0].free_business_profile_used_at != null) {
+                return res.json({ eligible: false });
+            }
+            return res.json({ eligible: true });
+        } else {
+            db.query("SELECT id FROM contacts WHERE owner_email = ? LIMIT 1", [userEmail], (err2, contactRes) => {
+                if (err2) return res.status(500).json({ error: 'Database error' });
+                if (contactRes.length > 0) {
+                    db.query("INSERT INTO user_profile_entitlements (user_id, free_business_profile_used_at) VALUES (?, NOW()) ON DUPLICATE KEY UPDATE free_business_profile_used_at=NOW()", [userEmail]);
+                    return res.json({ eligible: false });
+                } else {
+                    return res.json({ eligible: true });
+                }
+            });
+        }
+    });
+});
+
 app.post('/savecontacts1', (req, res) => {
     var { id, name, phone, email, service, location, location1, state, city, imagebolb, filename, about, keyword, landlineno, wpno, skypeno, category, output, services, publish, owner_email } = req.body;
     if (services == null) {
@@ -460,8 +499,16 @@ app.post('/savecontacts1', (req, res) => {
             if (checkErr) return res.status(500).send('Error checking contact');
             if (checkResult.length > 0) {
                 const finalImage = uniqueFilename || checkResult[0].image || '';
+                const currentVerification = checkResult[0].verification || 0;
+                let finalKeyword = keyword;
+                if (currentVerification === 0 && finalKeyword) {
+                    const keywordArr = finalKeyword.split(',').map(k => k.trim()).filter(k => k);
+                    if (keywordArr.length > 5) {
+                        finalKeyword = keywordArr.slice(0, 5).join(', ');
+                    }
+                }
                 var updateQuery = "UPDATE contacts SET name = ?, phone_no = ?, service = ?, email = ?, location = ?, location1 = ?, state = ?, city = ?, image = ?, about = ?, keywords = ?, landlineno = ?, wpno = ?, skypeno = ?, category = ?, phonenos = ?, owner_email = ?, services = ?, deleted_contact = 0 WHERE id = ?";
-                var updateValues = [name, phone, service, email, location, location1, state, city, finalImage, about, keyword, landlineno, wpno, skypeno, category, output, owner_email, services, id];
+                var updateValues = [name, phone, service, email, location, location1, state, city, finalImage, about, finalKeyword, landlineno, wpno, skypeno, category, output, owner_email, services, id];
 
                 db.query(updateQuery, updateValues, (updateErr) => {
                     if (updateErr) return res.status(500).send('Error updating profile');
@@ -473,8 +520,15 @@ app.post('/savecontacts1', (req, res) => {
                 });
             } else {
                 // Insert as new
-                const insertQuery = "INSERT INTO contacts (name, phone_no, email, service, location, location1, state, city, image, keywords, about, landlineno, wpno, skypeno, category, phonenos, publish, owner_email, services) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
-                const insertValues = [name, phone, email, service, location, location1, state, city, uniqueFilename, keyword, about, landlineno, wpno, skypeno, category, output, publish || 'yes', owner_email, services];
+                let finalKeyword = keyword;
+                if (finalKeyword) {
+                    const keywordArr = finalKeyword.split(',').map(k => k.trim()).filter(k => k);
+                    if (keywordArr.length > 5) {
+                        finalKeyword = keywordArr.slice(0, 5).join(', ');
+                    }
+                }
+                const insertQuery = "INSERT INTO contacts (name, phone_no, email, service, location, location1, state, city, image, keywords, about, landlineno, wpno, skypeno, category, phonenos, publish, owner_email, services, verification) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)";
+                const insertValues = [name, phone, email, service, location, location1, state, city, uniqueFilename, finalKeyword, about, landlineno, wpno, skypeno, category, output, publish || 'yes', owner_email, services];
 
                 db.query(insertQuery, insertValues, (insertErr, insertResult) => {
                     if (insertErr) return res.status(500).send('Error creating profile');
@@ -488,25 +542,76 @@ app.post('/savecontacts1', (req, res) => {
         });
     } else if (name != null && name.trim() !== '') {
         // ALWAYS INSERT a new profile when creating a profile (allows multiple profiles with same phone number)
-        const payStatus = req.body.payment_status || 'completed';
-        const txId = req.body.transaction_id || req.body.payment_id || null;
-        const payAmount = parseFloat(req.body.amount) || 499.00;
-        const insertQuery = "INSERT INTO contacts (name, phone_no, email, service, location, location1, state, city, image, keywords, about, landlineno, wpno, skypeno, category, phonenos, publish, owner_email, services, subscription_status, subscription_start, subscription_end, payment_status, transaction_id, amount) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', NOW(), DATE_ADD(NOW(), INTERVAL 1 YEAR), ?, ?, ?)";
-        const insertValues = [name, phone, email, service, location, location1, state, city, uniqueFilename, keyword, about, landlineno, wpno, skypeno, category, output, publish || 'yes', owner_email, services, payStatus, txId, payAmount];
+        const userEmail = owner_email || email;
+        const requestedAsFree = req.body.is_free === 'true';
 
-        db.query(insertQuery, insertValues, (insertErr, insertResult) => {
-            if (insertErr) {
-                console.error(insertErr);
-                return res.status(500).send('Error submitting report');
+        const checkEligibility = (callback) => {
+            db.query("SELECT * FROM user_profile_entitlements WHERE user_id = ?", [userEmail], (err, entResult) => {
+                if (err) return callback(err);
+                if (entResult.length > 0 && entResult[0].free_business_profile_used_at != null) {
+                    return callback(null, false);
+                } else if (entResult.length == 0) {
+                    db.query("SELECT id FROM contacts WHERE owner_email = ? LIMIT 1", [userEmail], (err2, contactRes) => {
+                        if (err2) return callback(err2);
+                        if (contactRes.length > 0) {
+                            db.query("INSERT INTO user_profile_entitlements (user_id, free_business_profile_used_at) VALUES (?, NOW()) ON DUPLICATE KEY UPDATE free_business_profile_used_at=NOW()", [userEmail]);
+                            return callback(null, false);
+                        }
+                        return callback(null, true);
+                    });
+                } else {
+                    return callback(null, true);
+                }
+            });
+        };
+
+        checkEligibility((err, isEligible) => {
+            if (err) return res.status(500).send('Error checking eligibility');
+
+            if (requestedAsFree && !isEligible) {
+                return res.status(403).json({ status: 'error', message: 'User is not eligible for a free profile. Payment required.' });
             }
-            // console.log(`Phone number saved successfully with new ID: ${insertResult.insertId}`);
-            res.status(200).json({ status: 'success', id: insertResult.insertId, message: 'Phone number saved successfully' });
-            if (imageBuffer != null && uniqueFilename) {
-                const imagePath = path.join(__dirname, 'uploads', uniqueFilename);
-                fs.writeFile(imagePath, imageBuffer, 'base64', (err) => {
-                    if (err) console.error(err);
-                });
+
+            if (!requestedAsFree) {
+                if (!req.body.payment_status || req.body.payment_status !== 'completed' || !req.body.transaction_id) {
+                    return res.status(400).json({ status: 'error', message: 'Payment verification failed' });
+                }
             }
+
+            const payStatus = requestedAsFree ? 'completed' : req.body.payment_status;
+            const txId = requestedAsFree ? 'FREE_PROFILE' : req.body.transaction_id;
+            const payAmount = requestedAsFree ? 0 : (parseFloat(req.body.amount) || 500.00);
+            const isVerified = requestedAsFree ? 0 : 1;
+
+            let finalKeyword = keyword;
+            if (isVerified === 0 && finalKeyword) {
+                const keywordArr = finalKeyword.split(',').map(k => k.trim()).filter(k => k);
+                if (keywordArr.length > 5) {
+                    finalKeyword = keywordArr.slice(0, 5).join(', ');
+                }
+            }
+
+            const insertQuery = "INSERT INTO contacts (name, phone_no, email, service, location, location1, state, city, image, keywords, about, landlineno, wpno, skypeno, category, phonenos, publish, owner_email, services, subscription_status, subscription_start, subscription_end, payment_status, transaction_id, amount, verification) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', NOW(), DATE_ADD(NOW(), INTERVAL 1 YEAR), ?, ?, ?, ?)";
+            const insertValues = [name, phone, email, service, location, location1, state, city, uniqueFilename, finalKeyword, about, landlineno, wpno, skypeno, category, output, publish || 'yes', owner_email, services, payStatus, txId, payAmount, isVerified];
+
+            db.query(insertQuery, insertValues, (insertErr, insertResult) => {
+                if (insertErr) {
+                    console.error(insertErr);
+                    return res.status(500).send('Error submitting report');
+                }
+
+                if (requestedAsFree) {
+                    db.query("INSERT INTO user_profile_entitlements (user_id, free_business_profile_used_at) VALUES (?, NOW()) ON DUPLICATE KEY UPDATE free_business_profile_used_at=NOW()", [userEmail]);
+                }
+
+                res.status(200).json({ status: 'success', id: insertResult.insertId, message: 'Phone number saved successfully' });
+                if (imageBuffer != null && uniqueFilename) {
+                    const imagePath = path.join(__dirname, 'uploads', uniqueFilename);
+                    fs.writeFile(imagePath, imageBuffer, 'base64', (err) => {
+                        if (err) console.error(err);
+                    });
+                }
+            });
         });
     } else {
         // Quick publish/email update

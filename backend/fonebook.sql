@@ -36779,8 +36779,18 @@ ALTER TABLE `reviews`
 --
 -- AUTO_INCREMENT for table `search_tags`
 --
-ALTER TABLE `search_tags`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=18708;
+--
+-- Table structure for table `user_profile_entitlements`
+--
+
+CREATE TABLE IF NOT EXISTS `user_profile_entitlements` (
+  `user_id` varchar(191) NOT NULL,
+  `free_business_profile_used_at` datetime DEFAULT NULL,
+  `created_at` datetime NOT NULL DEFAULT current_timestamp(),
+  `updated_at` datetime NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`user_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
 COMMIT;
 
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
