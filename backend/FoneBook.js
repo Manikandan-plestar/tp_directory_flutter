@@ -294,8 +294,16 @@ app.post('/savecontacts', (req, res) => {
             }
             if (selectResult.length > 0) {
                 const finalImage = uniqueFilename || selectResult[0].image || '';
+                const isVerified = selectResult[0].verification === 1;
+                let finalKeyword = keyword;
+                if (!isVerified && finalKeyword) {
+                    const keywordArr = finalKeyword.split(',').map(k => k.trim()).filter(k => k);
+                    if (keywordArr.length > 5) {
+                        finalKeyword = keywordArr.slice(0, 5).join(', ');
+                    }
+                }
                 var updateQuery = "UPDATE contacts SET name = ?, phone_no = ?, service = ?, email = ?, location = ?, location1 = ?, state = ?, city = ?, image = ?, about = ?, keywords = ?, landlineno = ?, wpno = ?, skypeno = ?, category = ?, phonenos = ?, owner_email = ?, services = ?, deleted_contact = 0 WHERE id = ?";
-                var updateValues = [name, phone, service, email, location, location1, state, city, finalImage, about, keyword, landlineno, wpno, skypeno, category, output, owner_email, services, id];
+                var updateValues = [name, phone, service, email, location, location1, state, city, finalImage, about, finalKeyword, landlineno, wpno, skypeno, category, output, owner_email, services, id];
 
                 db.query(updateQuery, updateValues, (updateErr, updateResult) => {
                     if (updateErr) {
@@ -473,6 +481,72 @@ app.get('/check_free_profile_eligibility', (req, res) => {
                 }
             });
         }
+    });
+});
+
+app.post('/upgrade_subscription', (req, res) => {
+    const { id, transaction_id, payment_status, amount, owner_email } = req.body;
+
+    if (!id) {
+        return res.status(400).json({ status: 'error', message: 'Profile ID is required' });
+    }
+    if (!payment_status || payment_status !== 'completed' || !transaction_id) {
+        return res.status(400).json({ status: 'error', message: 'Valid completed payment transaction is required' });
+    }
+
+    const payAmount = parseFloat(amount) || 500.00;
+
+    // Check if target profile exists
+    db.query("SELECT * FROM contacts WHERE id = ? AND deleted_contact = 0", [id], (err, profileRows) => {
+        if (err) {
+            console.error('Error querying profile for upgrade:', err);
+            return res.status(500).json({ status: 'error', message: 'Database error' });
+        }
+        if (!profileRows || profileRows.length === 0) {
+            return res.status(404).json({ status: 'error', message: 'Business profile not found' });
+        }
+
+        const profile = profileRows[0];
+
+        // Security check: Check if transaction_id was already used for a different profile
+        db.query("SELECT id FROM contacts WHERE transaction_id = ? AND id != ?", [transaction_id, id], (txErr, txRows) => {
+            if (txErr) {
+                console.error('Error checking transaction ID:', txErr);
+                return res.status(500).json({ status: 'error', message: 'Database error' });
+            }
+            if (txRows && txRows.length > 0) {
+                return res.status(409).json({ status: 'error', message: 'Transaction ID has already been redeemed for another profile.' });
+            }
+
+            // Grant Premium entitlements
+            const upgradeSql = `
+                UPDATE contacts SET
+                    verification = 1,
+                    payment_status = 'completed',
+                    transaction_id = ?,
+                    amount = ?,
+                    subscription_status = 'active',
+                    subscription_start = NOW(),
+                    subscription_end = DATE_ADD(NOW(), INTERVAL 1 YEAR)
+                WHERE id = ?;
+            `;
+
+            db.query(upgradeSql, [transaction_id, payAmount, id], (upErr, upResult) => {
+                if (upErr) {
+                    console.error('Error updating profile subscription:', upErr);
+                    return res.status(500).json({ status: 'error', message: 'Error upgrading profile' });
+                }
+
+                return res.status(200).json({
+                    status: 'success',
+                    id: id,
+                    name: profile.name,
+                    verification: 1,
+                    subscription_status: 'active',
+                    message: 'Business profile upgraded to Premium successfully'
+                });
+            });
+        });
     });
 });
 
@@ -782,30 +856,52 @@ app.post('/savetags', (req, res) => {
     const { id, tags, phone } = req.body;
 
     if (id) {
-        var updateQuery = "UPDATE contacts SET keywords=? WHERE id = ?";
-        var updateValues = [tags, id];
-
-        db.query(updateQuery, updateValues, (updateErr, updateResult) => {
-            if (updateErr) {
-                console.error(updateErr);
-                res.status(500).send('Error updating keywords');
-            } else {
-                // console.log(`Keywords updated for profile ${id}`);
-                res.status(200).send('Phone number saved successfully');
+        db.query("SELECT verification FROM contacts WHERE id = ?", [id], (vErr, vResult) => {
+            if (vErr) {
+                console.error(vErr);
+                return res.status(500).send('Error checking profile');
             }
+            const isVerified = (vResult && vResult.length > 0 && vResult[0].verification === 1);
+            let finalTags = tags;
+            if (!isVerified && finalTags) {
+                const tagArr = finalTags.split(',').map(t => t.trim()).filter(t => t);
+                if (tagArr.length > 5) {
+                    finalTags = tagArr.slice(0, 5).join(', ');
+                }
+            }
+            var updateQuery = "UPDATE contacts SET keywords=? WHERE id = ?";
+            var updateValues = [finalTags, id];
+
+            db.query(updateQuery, updateValues, (updateErr, updateResult) => {
+                if (updateErr) {
+                    console.error(updateErr);
+                    res.status(500).send('Error updating keywords');
+                } else {
+                    res.status(200).send('Phone number saved successfully');
+                }
+            });
         });
     } else {
-        var updateQuery = "UPDATE contacts SET keywords=? WHERE phone_no = ?";
-        var updateValues = [tags, phone];
-
-        db.query(updateQuery, updateValues, (updateErr, updateResult) => {
-            if (updateErr) {
-                console.error(updateErr);
-                res.status(500).send('Error updating phone number');
-            } else {
-                // console.log('Phone number updated successfully');
-                res.status(200).send('Phone number saved successfully');
+        db.query("SELECT verification FROM contacts WHERE phone_no = ?", [phone], (vErr, vResult) => {
+            const isVerified = (vResult && vResult.length > 0 && vResult[0].verification === 1);
+            let finalTags = tags;
+            if (!isVerified && finalTags) {
+                const tagArr = finalTags.split(',').map(t => t.trim()).filter(t => t);
+                if (tagArr.length > 5) {
+                    finalTags = tagArr.slice(0, 5).join(', ');
+                }
             }
+            var updateQuery = "UPDATE contacts SET keywords=? WHERE phone_no = ?";
+            var updateValues = [finalTags, phone];
+
+            db.query(updateQuery, updateValues, (updateErr, updateResult) => {
+                if (updateErr) {
+                    console.error(updateErr);
+                    res.status(500).send('Error updating phone number');
+                } else {
+                    res.status(200).send('Phone number saved successfully');
+                }
+            });
         });
     }
 });

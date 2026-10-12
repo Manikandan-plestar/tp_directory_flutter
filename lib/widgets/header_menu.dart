@@ -6,6 +6,7 @@ import '../screens/login_screen.dart';
 import '../screens/profile_list_screen.dart';
 import '../screens/favourites_screen.dart';
 import '../screens/app_profile_screen.dart';
+import '../screens/subscription_screen.dart';
 import 'notification_dialog.dart';
 
 class HeaderMenu extends StatefulWidget {
@@ -99,6 +100,20 @@ class _HeaderMenuState extends State<HeaderMenu> {
               return;
             }
 
+            if (v == 'Subscription') {
+              Navigator.of(context).popUntil((route) => route.isFirst);
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => SubscriptionScreen(
+                    api: effectiveApi,
+                    session: effectiveSession,
+                  ),
+                ),
+              );
+              return;
+            }
+
             String mode = '';
             if (v == 'Profile' || v == 'Business' || v == 'Directory') mode = 'profile';
             else if (v == 'Keywords') mode = 'keywords';
@@ -122,6 +137,7 @@ class _HeaderMenuState extends State<HeaderMenu> {
             const PopupMenuItem(value: 'Keywords', child: Text('Keywords')),
             const PopupMenuItem(value: 'Promote', child: Text('Promote')),
             const PopupMenuItem(value: 'Favourites', child: Text('Favourites')),
+            const PopupMenuItem(value: 'Subscription', child: Text('Subscription')),
             const PopupMenuItem(value: 'Logout', child: Text('Logout')),
           ],
         ),
