@@ -188,7 +188,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                           ),
                           const SizedBox(height: 16),
                           const Text(
-                            'FoneBook Safety Pass',
+                            'Tel Directory Safety Pass',
                             textAlign: TextAlign.center,
                             style: TextStyle(
                               fontFamily: 'Poppins',

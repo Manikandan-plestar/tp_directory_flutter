@@ -89,7 +89,7 @@ class _VisibilityScreenState extends State<VisibilityScreen> {
         child: Column(
           children: [
             AppHeader(
-              title: 'Fone Book',
+              title: 'Tel Directory',
               onBack: () => Navigator.pop(context),
               showMenu: true,
               api: widget.api,

@@ -51,7 +51,7 @@ class _WorldwideScreenState extends State<WorldwideScreen> {
             return Column(
               children: [
                 AppHeader(
-                  title: 'Fone Book',
+                  title: 'Tel Directory',
                   onBack: () => Navigator.pop(context),
                   showMenu: session != null && session.phone != null,
                   api: widget.api,

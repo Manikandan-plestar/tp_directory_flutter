@@ -97,7 +97,7 @@ class _ProfileListScreenState extends State<ProfileListScreen> {
       case 'traffic': 
         return widget.trafficType == 'organic' ? 'Organic Traffic Reports' : 'Paid Traffic Reports';
       case 'settings': return 'Settings';
-      default: return 'Fone Book';
+      default: return 'Tel Directory';
     }
   }
 

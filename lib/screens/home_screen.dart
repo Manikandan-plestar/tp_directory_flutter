@@ -113,7 +113,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 ],
               ),
               content: const Text(
-                'Fone Book collects location data while using the app to show nearby contacts, business listings, and calculate distances to services.',
+                'Tel Directory collects location data while using the app to show nearby contacts, business listings, and calculate distances to services.',
                 style: TextStyle(fontFamily: 'Poppins', fontSize: 13),
               ),
               actionsPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -1949,7 +1949,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       Image.asset('assets/images/phone_book_logo_round.png', width: 85, height: 85, fit: BoxFit.contain),
                       const SizedBox(height: 9),
                       const Text(
-                        'Fone Book',
+                        'Tel Directory',
                         style: TextStyle(fontSize: 22, fontWeight: FontWeight.w600, color: Color(0xFF202124), fontFamily: 'Poppins'),
                       ),
                     ],

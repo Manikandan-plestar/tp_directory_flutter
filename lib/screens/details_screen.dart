@@ -147,7 +147,7 @@ class _DetailsScreenState extends State<DetailsScreen> with SingleTickerProvider
         child: Column(
           children: [
             AppHeader(
-              title: 'Fone Book',
+              title: 'Tel Directory',
               onBack: () => Navigator.pop(context),
               session: _session,
               store: _store,

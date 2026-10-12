@@ -122,7 +122,7 @@ class _AppHeaderState extends State<AppHeader> {
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    widget.title.isEmpty ? 'Fone Book' : widget.title,
+                    widget.title.isEmpty ? 'Tel Directory' : widget.title,
                     style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: Color(0xFF232323), fontFamily: 'Poppins'),
                   ),
                 ),

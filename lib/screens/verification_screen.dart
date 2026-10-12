@@ -25,7 +25,7 @@ class _VerificationScreenState extends State<VerificationScreen> {
         child: Column(
           children: [
             AppHeader(
-              title: 'Fone Book',
+              title: 'Tel Directory',
               onBack: () => Navigator.pop(context),
               showMenu: true,
               api: ApiClient(),

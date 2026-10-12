@@ -78,7 +78,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
         child: Column(
           children: [
             AppHeader(
-              title: 'Fone Book',
+              title: 'Tel Directory',
               onBack: () => Navigator.pop(context),
               showMenu: true,
               api: widget.api,

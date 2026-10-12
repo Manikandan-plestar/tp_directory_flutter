@@ -75,7 +75,7 @@ class _PhoneEntryScreenState extends State<PhoneEntryScreen> {
         child: Column(
           children: [
             AppHeader(
-              title: 'Fone Book',
+              title: 'Tel Directory',
               onBack: () => Navigator.pop(context),
               showMenu: true,
               api: ApiClient(),
@@ -89,7 +89,7 @@ class _PhoneEntryScreenState extends State<PhoneEntryScreen> {
                   children: [
                     const SizedBox(height: 50),
                     const Text(
-                      'Fone Book Directory',
+                      'Tel Directory',
                       style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Color(0xFF232323), fontFamily: 'Poppins'),
                     ),
                     const SizedBox(height: 15),

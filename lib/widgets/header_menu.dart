@@ -195,7 +195,7 @@ class _HeaderMenuState extends State<HeaderMenu> {
           ],
         ),
         content: const Text(
-          'Are you sure you want to log out of Fone Book?',
+          'Are you sure you want to log out of Tel Directory?',
           style: TextStyle(fontFamily: 'Poppins', fontSize: 14, color: Color(0xFF495057)),
         ),
         actionsPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
